@@ -1,4 +1,4 @@
 #include "connect.h"
-#include "base64.h"
+#include "crypto.h"
 
 void sendMail(SSL *ssl);

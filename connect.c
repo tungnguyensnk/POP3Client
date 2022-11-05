@@ -1,5 +1,7 @@
 #include "connect.h"
 
+ACCOUNT account;
+
 int openConnection(const char *hostname, int port) {
     struct hostent *host;
     struct sockaddr_in addr;
@@ -40,19 +42,56 @@ SSL *initSSLConnect(const char *hostname, int port) {
     SSL_set_fd(ssl, server);    /* set socket */
     if (SSL_connect(ssl) == -1)   /* thuc hien handshake */
     { ERR_print_errors_fp(stderr); }
-
-    char buffer[1024] = {0};
-    SSL_read(ssl, buffer, sizeof(buffer));
+    recvMessage(ssl);
     return ssl;
 }
 
-char *sendMessage(SSL *ssl, char *message) {
+char *recvMessage(SSL *ssl) {
+    char *buffer = NULL;
+    int bytes, count = 0;
+    do {
+        buffer = (char *) realloc(buffer, (count + 1024) * sizeof(char));
+        memset(buffer + count, 0, 1024);
+        bytes = SSL_read(ssl, buffer + strlen(buffer), 1024 * sizeof(char)); /*nhan du lieu*/
+        count += bytes;
+    } while (buffer[count - 1] != '\n');
+    buffer[count] = 0;
+    return buffer;
+}
+
+char *recvMessageMultiLines(SSL *ssl) {
+    char *buffer = NULL;
+    int bytes, count = 0;
+    do {
+        buffer = (char *) realloc(buffer, (count + 1024) * sizeof(char));
+        memset(buffer + count, 0, 1024);
+        bytes = SSL_read(ssl, buffer + strlen(buffer), 1024 * sizeof(char)); /*nhan du lieu*/
+        count += bytes;
+    } while (buffer[count - 1] != '\n' || buffer[count - 3] != '.');
+    buffer[count] = 0;
+    return buffer;
+}
+
+void sendMessage(SSL *ssl, char *message) {
     if (message[strlen(message) - 1] == '\n')
         message[strlen(message) - 1] = '\0';
-    char *buffer = malloc(1024 * sizeof(char));
     sprintf(message + strlen(message), "\r\n");
     SSL_write(ssl, message, (int) strlen(message)); /*gui du lieu*/
-    int bytes = SSL_read(ssl, buffer, 1024 * sizeof(char)); /*nhan du lieu*/
-    buffer[bytes] = 0;
-    return buffer;
+    return;
+}
+
+SSL *verifyAccount(ACCOUNT account_t) {
+    SSL *ssl = initSSLConnect("pop.gmail.com", 995);
+    char command[500] = {0}, *response = NULL, check[10] = {0};
+    sprintf(command, "user %s", account_t.username);
+    sendMessage(ssl, command);
+    recvMessage(ssl);
+    sprintf(command, "pass %s", account_t.password);
+    sendMessage(ssl, command);
+    response = recvMessage(ssl);
+    sscanf(response, "%s %*s", check);
+    if (strcmp(check, "+OK") == 0)
+        return ssl;
+    SSL_free(ssl);
+    return NULL;
 }
