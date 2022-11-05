@@ -1,32 +1,27 @@
 #include "smtp.h"
 
 void sendMail(SSL *ssl) {
-//    char message[1024] = {0};
-//    sprintf(message, "helo localhost");
-//    printf("%s", sendMessage(ssl, message));
-//    sprintf(message, "auth login");
-//    printf("%s", sendMessage(ssl, message));
-//    printf("Nhap email:");
-//    //fgets(message, sizeof(message), stdin);
-//    sprintf(message,"tungnguyensnk");
-//    if (message[strlen(message) - 1] == '\n')
-//        message[strlen(message) - 1] = '\0';
-//    printf("%s\n", sendMessage(ssl, base64Encode(message)));
-//
-//    printf("Nhap pass:");
-//    //fgets(message, sizeof(message), stdin);
-//    sprintf(message,"heenydrjzorhurjy");
-//    if (message[strlen(message) - 1] == '\n')
-//        message[strlen(message) - 1] = '\0';
-//    printf("%s\n", sendMessage(ssl, base64Encode(message)));
-//    sprintf(message, "mail from:<tungnguyen@gmail.com>");
-//    printf("%s", sendMessage(ssl, message));
-//    sprintf(message, "rcpt to:<tung20194714@gmail.com>");
-//    printf("%s", sendMessage(ssl, message));
-//    sprintf(message, "data");
-//    printf("%s", sendMessage(ssl, message));
-//    sprintf(message, "subject: hello\r\nhi\r\n.");
-//    printf("%s", sendMessage(ssl, message));
+}
 
+SSL *loginSMTPServer(ACCOUNT account_t) {
+    SSL *ssl = initSSLConnect("smtp.gmail.com", 465);
+    char command[500] = {0}, *response = NULL;
+    int check = 0;
+
+    sprintf(command, "helo localhost");
+    sendMessage(ssl, command);
+    recvMessage(ssl);
+
+    sprintf(command, "auth plain");
+    sendMessage(ssl, command);
+    recvMessage(ssl);
+
+    sprintf(command, "\\0%s\\0%s", account_t.username, account_t.password);
+    sendMessage(ssl, base64Encode(command));
+    response = recvMessage(ssl);
+    sscanf(response, "%d %*s", &check);
+    if (check == 235)
+        return ssl;
     SSL_free(ssl);
+    return NULL;
 }
