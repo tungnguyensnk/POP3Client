@@ -76,9 +76,7 @@ void sendMessage(SSL *ssl, char *message) {
     if (message[strlen(message) - 1] == '\n')
         message[strlen(message) - 1] = '\0';
     sprintf(message + strlen(message), "\r\n");
-    SSL_write(ssl, message, (int) strlen(message)); /*gui du lieu*/
-    return;
-}
+    SSL_write(ssl, message, (int) strlen(message)); }
 
 SSL *verifyAccount(ACCOUNT account_t) {
     SSL *ssl = initSSLConnect("pop.gmail.com", 995);

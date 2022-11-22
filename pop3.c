@@ -19,7 +19,7 @@ EMAIL *getHeaderLetter(SSL *ssl, int id) {
 
     if (email->subject != NULL && strcmp(email->subject, "trống") != 0)
         strstr(email->subject, "\r\n")[0] = 0;
-    if (email->from != NULL  && strcmp(email->from, "trống") != 0)
+    if (email->from != NULL && strcmp(email->from, "trống") != 0)
         strstr(email->from, "\r\n")[0] = 0;
     if (email->to != NULL)
         strstr(email->to, "\r\n")[0] = 0;
@@ -37,32 +37,37 @@ EMAIL *getContent(SSL *ssl, int id) {
     sendMessage(ssl, command);
     char *response = recvMessageMultiLines(ssl);
 
-    email->content = strdup(strstr(response, "Content-Type: text/plain;"));
-    tmp = strstr(email->content, "\r\n--00");
+    tmp = strstr(response, "Content-Type: text/plain;");
     if (tmp != NULL) {
-        tmp[0] = 0;
-    } else
-        strstr(email->content, "\r\n--")[0] = 0;
+        email->plain = strdup(tmp);
+        tmp = strstr(email->plain, "\r\n--00");
+        if (tmp != NULL) {
+            tmp[0] = 0;
+        } else
+            strstr(email->plain, "\r\n--")[0] = 0;
 
-    if (strstr(email->content, "Content-Transfer-Encoding: ") != NULL) {
-        email->content = strstr(email->content, "Content-Transfer-Encoding: ") + 27;
+        if (strstr(email->plain, "Content-Transfer-Encoding: ") != NULL) {
+            email->plain = strstr(email->plain, "Content-Transfer-Encoding: ") + 27;
 
-        if (email->content[strlen(email->content) - 1] == '\n' && email->content[strlen(email->content) - 2] == '\r')
-            email->content[strlen(email->content) - 2] = '\0';
+            if (email->plain[strlen(email->plain) - 1] == '\n' &&
+                email->plain[strlen(email->plain) - 2] == '\r')
+                email->plain[strlen(email->plain) - 2] = '\0';
 
-        if (strncasecmp(email->content, "quoted-printable", 16) == 0) {
-            email->content = strstr(email->content, "\r\n\r\n") + 4;
-            email->content = qprintDecode(email->content);
-        } else if (strncasecmp(email->content, "base64", 6) == 0) {
-            email->content = strstr(email->content, "\r\n\r\n") + 4;
-            email->content = base64Decode(email->content);
-        } else {
-            printf("Định dạng mã hóa chưa được hỗ trợ.");
-            email->content = NULL;
-        }
-    } else
-        email->content = strstr(email->content, "\r\n\r\n") + 4;
+            if (strncasecmp(email->plain, "quoted-printable", 16) == 0) {
+                email->plain = strstr(email->plain, "\r\n\r\n") + 4;
+                email->plain = qprintDecode(email->plain);
+            } else if (strncasecmp(email->plain, "base64", 6) == 0) {
+                email->plain = strstr(email->plain, "\r\n\r\n") + 4;
+                email->plain = base64Decode(email->plain);
+            } else {
+                sprintf(email->plain, "Định dạng mã hóa chưa được hỗ trợ.");
+            }
+        } else
+            email->plain = strstr(email->plain, "\r\n\r\n") + 4;
 
+    } else {
+        email->plain = strdup("Không có nội dung dạng plain.");
+    }
 
     email->html = strdup(strstr(response, "Content-Type: text/html;"));
     tmp = strstr(email->html, "\r\n--00");
@@ -84,8 +89,7 @@ EMAIL *getContent(SSL *ssl, int id) {
             email->html = strstr(email->html, "\r\n\r\n") + 4;
             email->html = base64Decode(email->html);
         } else {
-            printf("Định dạng mã hóa chưa được hỗ trợ.");
-            email->html = NULL;
+            sprintf(email->html, "Định dạng mã hóa chưa được hỗ trợ.");
         }
     } else
         email->html = strstr(email->html, "\r\n\r\n") + 4;
@@ -99,25 +103,6 @@ EMAIL *getContent(SSL *ssl, int id) {
 
     }
 
-    email->attachment = strstr(response, "Content-Disposition: attachment;") != NULL ?
-                        strdup(strstr(response, "Content-Disposition: attachment;")) : NULL;
-    if (email->attachment != NULL) {
-        strstr(email->attachment, "\r\n--00")[0] = 0;
-
-        email->filename = strdup(strstr(email->attachment, "filename=\"") + 10);
-        strstr(email->filename, "\"\r\n")[0] = 0;
-
-        email->attachment = strdup(strstr(email->attachment, "\r\n\r\n") + 4);
-
-        tmp = NULL;
-        while ((tmp = strstr(email->attachment, "\r\n")) != NULL) {
-            memmove(tmp, tmp + 2, strlen(tmp) - 1);
-        }
-
-        char *cmd = malloc(strlen(email->attachment) + 50);
-        sprintf(cmd, "echo \"%s\" | base64 --decode > %s", email->attachment, email->filename);
-        system(cmd);
-    }
     return email;
 }
 
@@ -125,7 +110,7 @@ void showPageLetters(SSL *ssl, int page) {
     for (int i = (page - 1) * 10 + 1; i <= (page * 10 < totalLetters ? page * 10 : totalLetters); ++i) {
         EMAIL *email = getHeaderLetter(ssl, i);
         printf("\n%-4d------------------------------------------------------------", i);
-        printf("\nTiêu đề: %s\nNgười gửi: %s\nNgười nhận: %s\n",email->subject,email->from,email->to);
+        printf("\nTiêu đề: %s\nNgười gửi: %s\nNgười nhận: %s\n", email->subject, email->from, email->to);
         printf("----------------------------------------------------------------\n");
     }
 }

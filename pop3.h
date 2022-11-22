@@ -1,9 +1,6 @@
 #include "connect.h"
 #include "crypto.h"
-
-typedef struct mail {
-    char *from, *to, *subject, *content,*html, *filename, *attachment;
-} EMAIL;
+#include "mail.h"
 
 void getTotalLetters(SSL *ssl);
 

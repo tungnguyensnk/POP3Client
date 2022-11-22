@@ -49,12 +49,41 @@ void init() {
     clearScreen();
 
 }
-void xemChiTietThu(int id){
-    printLogo();
-    EMAIL *email = getContent(sslPOP,id);
-    printf("Tiêu đề: %s\nNgười gửi: %s\nNgười Nhận: %s\nNội dung:\n%s\n",email->subject,email->from,email->to,email->content);
-    exit(0);
-}
+
+//void xemChiTietThu(int id) {
+//    printLogo();
+//    EMAIL *email = getContent(sslPOP, id);
+//    printf("Tiêu đề: %s\nNgười gửi: %s\nNgười Nhận: %s\nNội dung:\n%s\n", email->subject, email->from, email->to,
+//           email->content);
+//    genHTML(email->html);
+//    while (1) {
+//        int hanhdong = -1;
+//        printf("\n\t0. Trở lại menu trước\n\t1. Mở thư định dạng HTML\n\t2. Trả lời mail%s\nChọn 1 hành động: ",
+//               email->filename != NULL ? "\n\t3. Mở file đính kèm" : "");
+//        scanf("%d", &hanhdong);
+//        clrs();
+//        switch (hanhdong) {
+//            case 0:
+//                return;
+//            case 1:
+//                system("/mnt/c/Windows/System32/cmd.exe /c \"start msedge file:///%cd%/content.html\"");
+//                break;
+//            case 2:
+//                break;
+//            case 3:
+//                if(email->filename != NULL){
+//                    char command[100] = {0};
+//                    sprintf(command, "/mnt/c/Windows/System32/cmd.exe /c \"start msedge file:///%%cd%%/%s\"", email->filename);
+//                    system(command);
+//                    break;
+//                }
+//            default: {
+//                printf("Ban da nhap sai. Nhap 1 so tu 1 den 3: ");
+//                continue;
+//            }
+//        }
+//    }
+//}
 
 void menuChonThu(int page) {
     while (0 == 0) {
@@ -71,7 +100,7 @@ void menuChonThu(int page) {
                 printf("Nhập 1 số từ %d đến %d: ", page * 10 < totalLetters ? page * 10 : totalLetters,
                        id < (page - 1) * 10 + 1);
         }
-        xemChiTietThu(id);
+        //xemChiTietThu(id);
     }
 }
 
@@ -125,8 +154,13 @@ void menu() {
 
 int main() {
     init();
-    while (0 == 0)
-        menu();
+    phanTichMail(sslPOP,5);
+//    EMAIL *email = getContent(sslPOP, 2);
+//    printf("Tiêu đề: %s\nNgười gửi: %s\nNgười Nhận: %s\nNội dung:\n%s\n", email->subject, email->from, email->to,
+//           email->content);
+//    genHTML(email->html);
+//    while (0 == 0)
+//        menu();
 //    getTotalLetters(sslPOP);
 
     //showPageLetters(ssl, 1);
