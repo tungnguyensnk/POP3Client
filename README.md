@@ -2,7 +2,7 @@
 Network programming Project. Send and receive Gmail messages using POP3 and SMTP.
 ## Project setup
 ```
-sudo apt-get install libssl-dev
+sudo apt-get install libssl-dev qprint
 ```
 ## Build
 ```
