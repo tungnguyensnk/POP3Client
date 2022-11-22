@@ -1,13 +1,24 @@
 #include "crypto.h"
 
-char *base64Encode(char *string) {
-    char command[200] = {0};
-    sprintf(command, "echo \"%s\" | base64 > out.txt", string);
-    system(command);
+char *crypto(char *string, OPTION option, TYPE type) {
+    if (option == ENCODE) {
+        if (type == BASE64)
+            return base64Encode(string);
+    } else {
+        if (type == BASE64)
+            return base64Decode(string);
+        if (type == QUOTED_PRINTABLE)
+            return qprintDecode(string);
+        if (type == _7BIT || type == _8BIT)
+            return string;
+    }
+}
+
+char *readDataOut() {
     FILE *f = fopen("out.txt", "rb");
     if (f != NULL) {
         fseek(f, 0, SEEK_END);
-        int fsize = ftell(f);
+        int fsize = (int) ftell(f);
         fseek(f, 0, SEEK_SET);
         char *data = (char *) calloc(fsize, 1);
         fread(data, 1, fsize, f);
@@ -17,25 +28,19 @@ char *base64Encode(char *string) {
         return NULL;
 }
 
+char *base64Encode(char *string) {
+    char command[200] = {0};
+    sprintf(command, "echo \"%s\" | base64 > out.txt", string);
+    system(command);
+    return readDataOut();
+}
+
 char *base64Decode(char *string) {
-    char *tmp = NULL;
-    while ((tmp = strstr(string, "\r\n")) != NULL) {
-        memmove(tmp, tmp + 2, strlen(tmp) - 1);
-    }
+    replace(string, "\r\n", "");
     char *command = malloc(strlen(string) + 50);
     sprintf(command, "echo \"%s\" | base64 --decode > out.txt", string);
     system(command);
-    FILE *f = fopen("out.txt", "rb");
-    if (f != NULL) {
-        fseek(f, 0, SEEK_END);
-        int fsize = ftell(f);
-        fseek(f, 0, SEEK_SET);
-        char *data = (char *) calloc(fsize, 1);
-        fread(data, 1, fsize, f);
-        fclose(f);
-        return data;
-    } else
-        return NULL;
+    return readDataOut();
 }
 
 char *qprintDecode(char *string) {
@@ -48,17 +53,21 @@ char *qprintDecode(char *string) {
     sprintf(command, "qprint -d \"in.txt\" > out.txt");
     system(command);
 
-    FILE *f2 = fopen("out.txt", "rb");
-    if (f2 != NULL) {
-        fseek(f2, 0, SEEK_END);
-        int fsize = ftell(f2);
-        fseek(f2, 0, SEEK_SET);
-        char *data = (char *) calloc(fsize, 1);
-        fread(data, 1, fsize, f2);
-        fclose(f2);
-        f2 = NULL;
+    return readDataOut();
+}
 
-        return data;
-    } else
-        return NULL;
+void replace(char *string, char *old, char *new) {
+    char *tmp = NULL;
+    while ((tmp = strstr(string, old)) != NULL) {
+        sprintf(tmp, "%s%s", new, tmp + strlen(old));
+    }
+}
+
+void base64DecodeInString(char *string) {
+    char *tmp = NULL;
+    if ((tmp = strstr(string, "=?UTF-8?B?")) != NULL) {
+        sprintf(string, "%s", tmp + 10);
+        char *result = base64Decode(strtok(strdup(string), "?="));
+        sprintf(string, "%s%s", result, strstr(string, "?=") + 2);
+    }
 }

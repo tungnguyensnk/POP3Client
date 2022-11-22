@@ -1,6 +1,7 @@
 #include "smtp.h"
 
 void sendMail(SSL *ssl) {
+
 }
 
 SSL *loginSMTPServer(ACCOUNT account_t) {
@@ -22,6 +23,5 @@ SSL *loginSMTPServer(ACCOUNT account_t) {
     sscanf(response, "%d %*s", &check);
     if (check == 235)
         return ssl;
-    SSL_free(ssl);
     return NULL;
 }

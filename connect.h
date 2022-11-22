@@ -1,5 +1,4 @@
-#ifndef connect_h
-#define connect_h
+#pragma once
 
 #include <stdio.h>
 #include <unistd.h>
@@ -15,7 +14,6 @@ typedef struct accounts {
     char username[100];
     char password[100];
 } ACCOUNT;
-#endif
 
 int openConnection(const char *hostname, int port);
 
