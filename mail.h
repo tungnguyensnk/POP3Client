@@ -1,5 +1,6 @@
 ﻿#pragma once
-#define TEXTPLAIN "multipart/mixed"
+#define PLAIN "text/plain"
+#define HTML "text/html"
 
 #include <stdio.h>
 #include "connect.h"
@@ -13,8 +14,6 @@ typedef struct attachment {
 } ATTACHMENT;
 
 typedef struct mail {
-    char *from, *to, *subject, *plain, *html;
+    char *from, *to, *subject, *date, *plain, *html;
     ATTACHMENT *attachments;
 } EMAIL;
-
-EMAIL *phanTichMail(SSL *ssl, int id);

@@ -24,6 +24,10 @@ char *base64Decode(char *string);
 
 char *qprintDecode(char *string);
 
-void replace(char *string, char *old, char *new);
+char *replace(char *string, char *old, char *new);
 
-void base64DecodeInString(char *string);
+char *decodeInSubString(char *string);
+
+char *readDataOut();
+
+char *base64EncodeFile(char *filename);

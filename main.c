@@ -1,10 +1,16 @@
+#include <signal.h>
 #include "connect.h"
 #include "crypto.h"
 #include "smtp.h"
 #include "pop3.h"
+#include "process.h"
+#include "text.h"
 
 extern ACCOUNT account;
 extern int totalLetters, totalPages;
+
+extern void signal_handler(int signum);
+
 SSL *sslPOP, *sslSMTP;
 
 void clrs() {
@@ -25,16 +31,18 @@ void printLogo() {
 }
 
 void init() {
+    signal(SIGINT, signal_handler);
+    signal(SIGCHLD, SIG_IGN);
     printLogo();
     while (sslPOP == NULL) {
         sprintf(account.username, "tungnguyensnk");
         sprintf(account.password, "heenydrjzorhurjy");
-        printf("Nhập tài khoản Gmail: ");
+        printf(C_BOLD "Nhập tài khoản Gmail: " C_OFF);
         //fgets(account.username, sizeof(account.username), stdin);
         if (account.username[strlen(account.username) - 1] == '\n')
             account.username[strlen(account.username) - 1] = '\0';
 
-        printf("Nhập mật khẩu Gmail: ");
+        printf(C_BOLD"Nhập mật khẩu Gmail: "C_OFF);
         //fgets(account.password, sizeof(account.password), stdin);
         if (account.password[strlen(account.password) - 1] == '\n')
             account.password[strlen(account.password) - 1] = '\0';
@@ -42,7 +50,7 @@ void init() {
         sslPOP = verifyAccount(account);
         if (sslPOP == NULL) {
             printLogo();
-            printf("Sai tài khoản hoặc mật khẩu.\n");
+            printf(C_RED"Sai tài khoản hoặc mật khẩu.\n"C_OFF);
         }
     }
     sslSMTP = loginSMTPServer(account);
@@ -154,16 +162,20 @@ void menu() {
 
 int main() {
     init();
-    phanTichMail(sslPOP,5);
+    //analyzingHeaderMail(sslPOP,1);
+    //analyzingHeaderMail(sslPOP,2);
+    //analyzingHeaderMail(sslPOP,7);
 //    EMAIL *email = getContent(sslPOP, 2);
 //    printf("Tiêu đề: %s\nNgười gửi: %s\nNgười Nhận: %s\nNội dung:\n%s\n", email->subject, email->from, email->to,
 //           email->content);
 //    genHTML(email->html);
 //    while (0 == 0)
 //        menu();
-//    getTotalLetters(sslPOP);
 
-    //showPageLetters(ssl, 1);
+    getTotalLetters(sslPOP);
+    showPageLetters(sslPOP, 1);
     //genHTML(getContent(ssl, 5)->html);
+    free(sslPOP);
+    free(sslSMTP);
     return 0;
 }

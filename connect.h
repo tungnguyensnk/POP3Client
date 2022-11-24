@@ -9,6 +9,7 @@
 #include <openssl/err.h>
 #include <bits/sigthread.h>
 #include <math.h>
+#include "process.h"
 
 typedef struct accounts {
     char username[100];

@@ -1,117 +1,252 @@
-﻿#include "pop3.h"
+﻿#include <time.h>
+#include "pop3.h"
 
 int totalLetters = 0, totalPages = 0;
 
-EMAIL *getHeaderLetter(SSL *ssl, int id) {
-    char command[50] = {0}, *response = NULL;
-    EMAIL *email = malloc(sizeof(EMAIL));
-    sprintf(command, "top %d 0", id);
-    sendMessage(ssl, command);
-    response = recvMessageMultiLines(ssl);
+void checkPara(char *string, char *head, char **pt) {
+    if (strncasecmp(string, head, strlen(head)) == 0) {
+        char *tmp1 = malloc(strlen(string) + 1);
+        snprintf(tmp1, strlen(string) + 1, "%s", string);
+        char *temp = strstr(tmp1, " ");
+        if (temp != NULL) {
+            *pt = strdup(temp + 1);
+            temp = NULL;
+        } else {
+            *pt = strdup("NULL");
+        }
+        free(tmp1);
+    }
+}
 
-    email->subject = strdup(strstr(response, "Subject") + 8);
-    if (email->subject[0] != ' ')
-        sprintf(email->subject, "trống");
-    email->from = strdup(strstr(response, "From") + 5);
-    if (email->from[0] != ' ')
-        sprintf(email->from, "trống");
-    email->to = strstr(response, "\nTo") != NULL ? (strdup(strstr(response, "\nTo") + 4)) : NULL;
+void getBoundary(char string[], char **pt) {
+    char *tmp1 = NULL;
+    if ((tmp1 = strstr(string, "boundary=")) != NULL) {
+        char tmp[50] = {0};
+        sprintf(tmp, "--%s", tmp1 + 10);
+        *pt = strdup(tmp);
+        (*pt)[strlen(*pt) - 1] = 0;
+        tmp1 = NULL;
+    }
+}
 
-    if (email->subject != NULL && strcmp(email->subject, "trống") != 0)
-        strstr(email->subject, "\r\n")[0] = 0;
-    if (email->from != NULL && strcmp(email->from, "trống") != 0)
-        strstr(email->from, "\r\n")[0] = 0;
-    if (email->to != NULL)
-        strstr(email->to, "\r\n")[0] = 0;
+EMAIL *checkPart(char part[], EMAIL *email) {
+    char encoding[50] = {0}, *header = NULL, *body = NULL, *line = NULL, kind[50] = {0};
+    TYPE type;
+    ATTACHMENT *attachment = NULL;
+    body = strdup(strstr(part, "\r\n\r\n") + 4);
+    header = strdup(part);
+    strstr(header, "\r\n\r\n")[0] = 0;
+    line = strtok(strdup(header), "\r\n");
 
-    free(response);
-    response = NULL;
+    int hasAttachment = 0;
+    while (line != NULL) {
+        if (strncasecmp(line, "Content-Type:", 13) == 0) {
+            sscanf(line, "%*s %s", kind);
+            if (kind[strlen(kind) - 1] == ';')
+                kind[strlen(kind) - 1] = 0;
+
+        }
+        if (strncasecmp(line, "Content-Transfer-Encoding:", 26) == 0) {
+            sscanf(line, "%*s %s", encoding);
+            if (strcasecmp(encoding, "base64") == 0) {
+                type = BASE64;
+            } else if (strcasecmp(encoding, "quoted-printable") == 0) {
+                type = QUOTED_PRINTABLE;
+            }
+        }
+        if (strncasecmp(line, "Content-Disposition: attachment", 31) == 0) {
+            hasAttachment = 1;
+            attachment = malloc(sizeof(ATTACHMENT));
+            attachment->next = NULL;
+            if (strstr(line, "filename=") != NULL)
+                attachment->filename = strdup(strstr(line, "filename=") + 9);
+            else {
+                line = strtok(NULL, "\r\n");
+                attachment->filename = strdup(strstr(line, "filename=") + 9);
+            }
+            if (attachment->filename[0] == '"') {
+                attachment->filename = attachment->filename + 1;
+                attachment->filename[strlen(attachment->filename) - 1] = 0;
+            }
+        }
+        if (strncasecmp(line, "X-Attachment-Id:", 16) == 0) {
+            sscanf(line, "%*s %s", attachment->id);
+        }
+        line = strtok(NULL, "\r\n");
+    }
+
+    char *result = crypto(body, DECODE, type);
+
+    if (!hasAttachment) {
+        if (strcasecmp(kind, "text/plain") == 0)
+            email->plain = strdup(result);
+        else if (strcasecmp(kind, "text/html") == 0)
+            email->html = strdup(result);
+    } else {
+        attachment->data = strdup(body);
+        rename("out.txt", attachment->filename);
+        char tmp10[120] = {0};
+        sprintf(tmp10, "cid:%s", attachment->id);
+        replace(email->html, tmp10, attachment->filename);
+        if (email->attachments == NULL)
+            email->attachments = attachment;
+        else {
+            ATTACHMENT *tmp = email->attachments;
+            while (tmp->next != NULL)
+                tmp = tmp->next;
+            tmp->next = attachment;
+        }
+    }
+    free(header);
+    free(body);
+    header = NULL;
+    body = NULL;
+
     return email;
 }
 
-EMAIL *getContent(SSL *ssl, int id) {
-    EMAIL *email = getHeaderLetter(ssl, id);
+void convertTime(char *string) {
+    struct tm *info = malloc(sizeof(struct tm));
+    memset(info, 0, sizeof(struct tm));
+    int timezone_t = 0;
+    strptime(string, "%a, %d %b %Y %H:%M:%S", info);
+    sscanf(string, "%*s %*s %*s %*s %*s %d", &timezone_t);
+    timezone_t /= 100;
 
+    time_t oldtime = mktime(info) + (7 - timezone_t) * 3600;
+    info = localtime(&oldtime);
+
+    time_t now = time(NULL);
+
+    int diff = (int) difftime(now, oldtime);
+    if (diff < 60)
+        sprintf(string, "%d giây trước", diff);
+    else if (diff < 3600)
+        sprintf(string, "%d phút trước", diff / 60);
+    else if (diff < 86400)
+        sprintf(string, "%d giờ trước", diff / 3600);
+    else if (diff < 604800)
+        sprintf(string, "%d ngày trước", diff / 86400);
+    else
+        strftime(string, 30, "%H:%M:%S %d/%m/%Y", info);
+}
+
+EMAIL *getHeader(EMAIL *email, char *response, char **boundary1, char **boundary2) {
+    char *line = NULL, *part = NULL;
+    part = response;
+    while ((part = strstr(part, "\r\n")) != NULL) {
+        if (strncasecmp(part, "\r\nContent-Type", 14) == 0)
+            break;
+        if (part[2] == ' ' || part[2] == '\t') {
+            int i = 2;
+            while (part[i] == ' ' || part[i] == '\t')
+                i++;
+            memcpy(part, part + i, strlen(part + i) + 1);
+        } else
+            part += 2;
+    }
+
+    int ran = 0;
+    char *tmp = malloc(strlen(response) + 1);
+    snprintf(tmp, strlen(response) + 1, "%s", response);
+    while ((line = strtok((ran == 0 ? tmp : NULL), "\r\n")) != NULL) {
+        ran = 1;
+        checkPara(line, "subject", &(email->subject));
+        checkPara(line, "from", &(email->from));
+        checkPara(line, "to:", &(email->to));
+        checkPara(line, "date:", &(email->date));
+        if (*boundary1 == NULL)
+            getBoundary(line, boundary1);
+        else if (*boundary2 == NULL)
+            getBoundary(line, boundary2);
+        else
+            break;
+    }
+    free(tmp);
+    email->subject = decodeInSubString(email->subject);
+    email->from = decodeInSubString(email->from);
+    email->to = decodeInSubString(email->to);
+    convertTime(email->date);
+
+    return email;
+}
+
+EMAIL *analyzingHeaderMail(SSL *ssl, int id) {
     char command[50] = {0}, *tmp = NULL;
+    EMAIL *email = malloc(sizeof(EMAIL));
+    bzero(email, sizeof(EMAIL));
+    sprintf(command, "top %d 0", id);
+    sendMessage(ssl, command);
+    char *response = recvMessageMultiLines(ssl);
+    email = getHeader(email, response, &tmp, &tmp);
+    return email;
+}
+
+EMAIL *analyzingMail(SSL *ssl, int id) {
+    char command[50] = {0}, *boundary1 = NULL, *boundary2 = NULL, *data = NULL;
+    EMAIL *email = malloc(sizeof(EMAIL));
+    bzero(email, sizeof(EMAIL));
     sprintf(command, "retr %d", id);
     sendMessage(ssl, command);
     char *response = recvMessageMultiLines(ssl);
 
-    tmp = strstr(response, "Content-Type: text/plain;");
-    if (tmp != NULL) {
-        email->plain = strdup(tmp);
-        tmp = strstr(email->plain, "\r\n--00");
-        if (tmp != NULL) {
-            tmp[0] = 0;
-        } else
-            strstr(email->plain, "\r\n--")[0] = 0;
+//    char *response = NULL;
+//    FILE *f = fopen("tmp1.txt", "rb");
+//    if (f != NULL) {
+//        fseek(f, 0, SEEK_END);
+//        int fsize = ftell(f);
+//        fseek(f, 0, SEEK_SET);
+//        response = (char *) calloc(fsize, 1);
+//        fread(response, 1, fsize, f);
+//        fclose(f);
+//    }
 
-        if (strstr(email->plain, "Content-Transfer-Encoding: ") != NULL) {
-            email->plain = strstr(email->plain, "Content-Transfer-Encoding: ") + 27;
+    email = getHeader(email, response, &boundary1, &boundary2);
 
-            if (email->plain[strlen(email->plain) - 1] == '\n' &&
-                email->plain[strlen(email->plain) - 2] == '\r')
-                email->plain[strlen(email->plain) - 2] = '\0';
+    if (boundary2 != NULL)
+        replace(response, boundary2, boundary1);
+    data = strdup(response);
 
-            if (strncasecmp(email->plain, "quoted-printable", 16) == 0) {
-                email->plain = strstr(email->plain, "\r\n\r\n") + 4;
-                email->plain = qprintDecode(email->plain);
-            } else if (strncasecmp(email->plain, "base64", 6) == 0) {
-                email->plain = strstr(email->plain, "\r\n\r\n") + 4;
-                email->plain = base64Decode(email->plain);
-            } else {
-                sprintf(email->plain, "Định dạng mã hóa chưa được hỗ trợ.");
-            }
-        } else
-            email->plain = strstr(email->plain, "\r\n\r\n") + 4;
+    while (data != NULL) {
+        if (boundary1 != NULL) {
+            char *tmp = strstr(data, boundary1);
+            if (tmp != NULL) {
+                data = tmp != NULL ? strdup(tmp) : NULL;
+                data += strlen(boundary1) + 2;
+            } else
+                data = NULL;
+            if (data == NULL || strncasecmp(data, "Content-Type", 12) != 0 ||
+                (boundary2 != NULL && strstr(data, boundary2 + 2) != NULL))
+                continue;
+            char *part = strdup(data);
+            tmp = strstr(part, boundary1);
+            if (tmp != NULL)
+                tmp[0] = 0;
 
-    } else {
-        email->plain = strdup("Không có nội dung dạng plain.");
-    }
-
-    email->html = strdup(strstr(response, "Content-Type: text/html;"));
-    tmp = strstr(email->html, "\r\n--00");
-    if (tmp != NULL) {
-        tmp[0] = 0;
-    } else
-        strstr(email->html, "\r\n--")[0] = 0;
-
-    if (strstr(email->html, "Content-Transfer-Encoding: ") != NULL) {
-        email->html = strstr(email->html, "Content-Transfer-Encoding: ") + 27;
-
-        if (email->html[strlen(email->html) - 1] == '\n' && email->html[strlen(email->html) - 2] == '\r')
-            email->html[strlen(email->html) - 2] = '\0';
-
-        if (strncasecmp(email->html, "quoted-printable", 16) == 0) {
-            email->html = strstr(email->html, "\r\n\r\n") + 4;
-            email->html = qprintDecode(email->html);
-        } else if (strncasecmp(email->html, "base64", 6) == 0) {
-            email->html = strstr(email->html, "\r\n\r\n") + 4;
-            email->html = base64Decode(email->html);
+            while (part[strlen(part) - 1] == '\r' || part[strlen(part) - 1] == '\n')
+                part[strlen(part) - 1] = 0;
+            email = checkPart(part, email);
         } else {
-            sprintf(email->html, "Định dạng mã hóa chưa được hỗ trợ.");
+            data = strstr(data, "\r\nContent-Type:") != NULL ? strstr(data, "\r\nContent-Type:") + 2 : NULL;
+            if (data != NULL) {
+                strstr(data, "\r\n.\r\n")[0] = 0;
+                email = checkPart(data, email);
+            }
+            data = NULL;
         }
-    } else
-        email->html = strstr(email->html, "\r\n\r\n") + 4;
-
-    tmp = strdup(email->html);
-    char *tmp1 = strstr(tmp, "<img src=\"cid");
-    if (tmp1 != NULL) {
-        char *src = strdup(strstr(tmp1, "alt=\"") + 3);
-        tmp1[5] = 0;
-        sprintf(email->html, "%salt=\"ig\" src%s", tmp, src);
 
     }
-
     return email;
+
 }
 
 void showPageLetters(SSL *ssl, int page) {
     for (int i = (page - 1) * 10 + 1; i <= (page * 10 < totalLetters ? page * 10 : totalLetters); ++i) {
-        EMAIL *email = getHeaderLetter(ssl, i);
-        printf("\n%-4d------------------------------------------------------------", i);
-        printf("\nTiêu đề: %s\nNgười gửi: %s\nNgười nhận: %s\n", email->subject, email->from, email->to);
-        printf("----------------------------------------------------------------\n");
+        EMAIL *email = analyzingHeaderMail(ssl, i);
+        printf(C_BRIGHT_WHITE"\n%-4d------------------------------------------------------------"C_OFF, i);
+        printf("\nTiêu đề: %.60s\nThời gian: %s\nNgười gửi: %s\nNgười nhận: %s\n", email->subject, email->date,
+               email->from, email->to);
+        printf(C_BRIGHT_WHITE"----------------------------------------------------------------\n"C_OFF);
     }
 }
 
@@ -121,7 +256,8 @@ void getTotalLetters(SSL *ssl) {
     response = recvMessage(ssl);
     sscanf(response, "%*s %d %*s", &totalLetters);
     totalPages = ceil(totalLetters / 10.0);
-    return;
+    free(response);
+    response = NULL;
 }
 
 void genHTML(char *string) {
@@ -130,11 +266,20 @@ void genHTML(char *string) {
         content = malloc(strlen(string) + 600);
         memset(content, 0, strlen(string) + 600);
         snprintf(content, strlen(string) + 600,
-                 "<!DOCTYPE html> <html lang=\"vi\"> <head> <meta charset=\"UTF-8\"> <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\"> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"> <title>Gmail</title><style> body { height: 95vh; display: flex; align-items: center; }  #main { width: 50%%; margin: auto; border-radius: 20px; padding: 40px; background: #ecf0f3; box-shadow: 14px 14px 20px #cbced1, -14px -14px 20px white; } </style></head> <body> <div id=\"main\">%s</div> </body> </html>",
+                 "<!DOCTYPE html> <html lang=\"vi\"> <head> <meta charset=\"UTF-8\"> "
+                 "<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\"> "
+                 "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"> "
+                 "<title>Gmail</title><style> body { height: 95vh; display: flex; align-items: center; } "
+                 " #main { width: 50%%; margin: auto; border-radius: 20px; padding: 40px;"
+                 " background: #ecf0f3; box-shadow: 14px 14px 20px #cbced1, -14px -14px 20px white; } "
+                 "</style></head> <body> <div id=\"main\">%s</div> </body> </html>",
                  string);
     } else
         content = strdup(string);
     FILE *f3 = fopen("content.html", "w");
     fprintf(f3, "%s", content);
     fclose(f3);
+    free(content);
+    content = NULL;
+    f3 = NULL;
 }
