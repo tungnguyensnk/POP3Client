@@ -49,6 +49,13 @@ char *base64Encode(char *string) {
     return readDataOut();
 }
 
+char *base64EncodeString(char *string) {
+    char command[2000] = {0};
+    snprintf(command, sizeof command, "echo -n \"%s\" | base64 > out.txt", string);
+    system(command);
+    return readDataOut();
+}
+
 char *base64Decode(char *string) {
     string = replace(string, "\r\n", "");
     writeDataIn(string);

@@ -87,7 +87,8 @@ EMAIL *checkPart(char part[], EMAIL *email) {
         rename("out.txt", attachment->filename);
         char tmp10[120] = {0};
         sprintf(tmp10, "cid:%s", attachment->id);
-        replace(email->html, tmp10, attachment->filename);
+        if (email->html != NULL)
+            replace(email->html, tmp10, attachment->filename);
         if (email->attachments == NULL)
             email->attachments = attachment;
         else {
@@ -189,17 +190,6 @@ EMAIL *analyzingMail(SSL *ssl, int id) {
     sprintf(command, "retr %d", id);
     sendMessage(ssl, command);
     char *response = recvMessageMultiLines(ssl);
-
-//    char *response = NULL;
-//    FILE *f = fopen("tmp1.txt", "rb");
-//    if (f != NULL) {
-//        fseek(f, 0, SEEK_END);
-//        int fsize = ftell(f);
-//        fseek(f, 0, SEEK_SET);
-//        response = (char *) calloc(fsize, 1);
-//        fread(response, 1, fsize, f);
-//        fclose(f);
-//    }
 
     email = getHeader(email, response, &boundary1, &boundary2);
 

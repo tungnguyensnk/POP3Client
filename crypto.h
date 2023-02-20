@@ -31,3 +31,5 @@ char *decodeInSubString(char *string);
 char *readDataOut();
 
 char *base64EncodeFile(char *filename);
+
+char *base64EncodeString(char *string);

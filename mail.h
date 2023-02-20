@@ -1,6 +1,4 @@
 ﻿#pragma once
-#define PLAIN "text/plain"
-#define HTML "text/html"
 
 #include <stdio.h>
 #include "connect.h"

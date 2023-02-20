@@ -27,3 +27,5 @@ char *recvMessage(SSL *ssl);
 char *recvMessageMultiLines(SSL *ssl);
 
 SSL *verifyAccount(ACCOUNT account_t);
+
+void sendRawMessage(SSL *ssl, char *message);

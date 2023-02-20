@@ -95,6 +95,11 @@ void sendMessage(SSL *ssl, char *message) {
     SSL_write(ssl, tmp, (int) strlen(tmp));
 }
 
+void sendRawMessage(SSL *ssl, char *message) {
+    SSL_write(ssl, message, (int) strlen(message));
+}
+
+
 SSL *verifyAccount(ACCOUNT account_t) {
     SSL *ssl = initSSLConnect("pop.gmail.com", 995);
     char command[500] = {0}, *response = NULL, check[10] = {0};

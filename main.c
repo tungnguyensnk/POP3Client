@@ -35,15 +35,15 @@ void init() {
     signal(SIGCHLD, SIG_IGN);
     printLogo();
     while (sslPOP == NULL) {
-        sprintf(account.username, "tungnguyensnk");
-        sprintf(account.password, "heenydrjzorhurjy");
+//        sprintf(account.username, "tungnguyensnk@gmail.com");
+//        sprintf(account.password, "difdgejnxcekhlgd");
         printf(C_BOLD "Nhập tài khoản Gmail: " C_OFF);
-        //fgets(account.username, sizeof(account.username), stdin);
+        fgets(account.username, sizeof(account.username), stdin);
         if (account.username[strlen(account.username) - 1] == '\n')
             account.username[strlen(account.username) - 1] = '\0';
 
         printf(C_BOLD"Nhập mật khẩu Gmail: "C_OFF);
-        //fgets(account.password, sizeof(account.password), stdin);
+        fgets(account.password, sizeof(account.password), stdin);
         if (account.password[strlen(account.password) - 1] == '\n')
             account.password[strlen(account.password) - 1] = '\0';
 
@@ -54,44 +54,65 @@ void init() {
         }
     }
     sslSMTP = loginSMTPServer(account);
+    if (sslSMTP == NULL) {
+        printf(C_RED"Không thể kết nối đến máy chủ SMTP.\n"C_OFF);
+        exit(0);
+    }
     clearScreen();
-
 }
 
-//void xemChiTietThu(int id) {
-//    printLogo();
-//    EMAIL *email = getContent(sslPOP, id);
-//    printf("Tiêu đề: %s\nNgười gửi: %s\nNgười Nhận: %s\nNội dung:\n%s\n", email->subject, email->from, email->to,
-//           email->content);
-//    genHTML(email->html);
-//    while (1) {
-//        int hanhdong = -1;
-//        printf("\n\t0. Trở lại menu trước\n\t1. Mở thư định dạng HTML\n\t2. Trả lời mail%s\nChọn 1 hành động: ",
-//               email->filename != NULL ? "\n\t3. Mở file đính kèm" : "");
-//        scanf("%d", &hanhdong);
-//        clrs();
-//        switch (hanhdong) {
-//            case 0:
-//                return;
-//            case 1:
-//                system("/mnt/c/Windows/System32/cmd.exe /c \"start msedge file:///%cd%/content.html\"");
-//                break;
-//            case 2:
-//                break;
-//            case 3:
-//                if(email->filename != NULL){
-//                    char command[100] = {0};
-//                    sprintf(command, "/mnt/c/Windows/System32/cmd.exe /c \"start msedge file:///%%cd%%/%s\"", email->filename);
-//                    system(command);
-//                    break;
-//                }
-//            default: {
-//                printf("Ban da nhap sai. Nhap 1 so tu 1 den 3: ");
-//                continue;
-//            }
-//        }
-//    }
-//}
+void xemChiTietThu(int id) {
+    printLogo();
+    EMAIL *email = analyzingMail(sslPOP, id);
+    printf("Tiêu đề: %s\nNgười gửi: %s\nNgười nhận: %s\nNgày gửi: %s\n\nNội dung:\n%s\n",
+           email->subject, email->from, email->to, email->date, email->plain);
+    genHTML(email->html);
+    while (1) {
+        int hanhdong = -1;
+        printf("\n\t0. Trở lại menu trước\n\t1. Mở thư định dạng HTML\n\t2. Trả lời mail%s\nChọn 1 hành động: ",
+               email->attachments != NULL ? "\n\t3. Mở file đính kèm" : "");
+        scanf("%d", &hanhdong);
+        clrs();
+        switch (hanhdong) {
+            case 0:
+                return;
+            case 1:
+                system("/mnt/c/Windows/System32/cmd.exe /c \"start msedge file:///%cd%/content.html\"");
+                break;
+            case 2:
+                formSendMail(sslSMTP, account.username, email->from);
+                break;
+            case 3:
+                if (email->attachments != NULL) {
+                    ATTACHMENT *attachment = email->attachments;
+                    char list[100][100] = {0};
+                    int i = 0;
+                    while (attachment != NULL) {
+                        printf("%d. %s", i + 1, attachment->filename);
+                        sprintf(list[i], "%s", attachment->filename);
+                        attachment = attachment->next;
+                        i++;
+                    }
+                    int choice = -1;
+                    while (choice < 0 || choice > i) {
+                        printf("\nChọn file đính kèm: ");
+                        scanf("%d", &choice);
+                        clrs();
+                    }
+                    char *filename = list[choice - 1];
+                    char command[1000] = {0};
+                    sprintf(command, "/mnt/c/Windows/System32/cmd.exe /c \"start msedge file:///%%cd%%/%s\"",
+                            filename);
+                    system(command);
+                    break;
+                }
+            default: {
+                printf("Ban da nhap sai. Nhap 1 so tu 1 den 3: ");
+                continue;
+            }
+        }
+    }
+}
 
 void menuChonThu(int page) {
     while (0 == 0) {
@@ -108,7 +129,7 @@ void menuChonThu(int page) {
                 printf("Nhập 1 số từ %d đến %d: ", page * 10 < totalLetters ? page * 10 : totalLetters,
                        id < (page - 1) * 10 + 1);
         }
-        //xemChiTietThu(id);
+        xemChiTietThu(id);
     }
 }
 
@@ -130,7 +151,9 @@ void menuXemDSThu() {
 }
 
 void menuGuiThu() {
-
+    clrs();
+    printLogo();
+    formSendMail(sslSMTP, account.username, NULL);
 }
 
 void menu() {
@@ -150,6 +173,8 @@ void menu() {
                 return;
             case 3:
                 printf("Cảm ơn bạn đã sử dụng dịch vụ.\n");
+                free(sslPOP);
+                free(sslSMTP);
                 exit(0);
             default: {
                 printf("Ban da nhap sai. Nhap 1 so tu 1 den 3: ");
@@ -162,20 +187,6 @@ void menu() {
 
 int main() {
     init();
-    //analyzingHeaderMail(sslPOP,1);
-    //analyzingHeaderMail(sslPOP,2);
-    //analyzingHeaderMail(sslPOP,7);
-//    EMAIL *email = getContent(sslPOP, 2);
-//    printf("Tiêu đề: %s\nNgười gửi: %s\nNgười Nhận: %s\nNội dung:\n%s\n", email->subject, email->from, email->to,
-//           email->content);
-//    genHTML(email->html);
-//    while (0 == 0)
-//        menu();
-
-    getTotalLetters(sslPOP);
-    showPageLetters(sslPOP, 1);
-    //genHTML(getContent(ssl, 5)->html);
-    free(sslPOP);
-    free(sslSMTP);
-    return 0;
+    while (0 == 0)
+        menu();
 }
